@@ -1,0 +1,10 @@
+# Unmasked working data and local outputs - never commit
+data/
+output/
+__pycache__/
+~$*.xlsx
+.claude/
+
+# Raw MIS workbooks (unmasked). Keep this line to run the pipeline on your laptop and push only
+# the masked docs/. Delete it to commit workbooks and let the GitHub Action rebuild the dashboard.
+input/*.xlsx

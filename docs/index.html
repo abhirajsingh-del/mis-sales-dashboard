@@ -1,0 +1,917 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mCaffeine · Hyphen — MIS Sales Dashboard</title>
+<script>
+// Theme before first paint: a stored choice wins, otherwise light (same rule as the LMD dashboard)
+(function(){var s=null;try{s=localStorage.getItem('dashboardTheme')}catch(e){}
+  document.documentElement.setAttribute('data-theme',(s==='light'||s==='dark')?s:'light');})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>/* tokens — same set as the LMD Cost Dashboard */
+:root{
+  color-scheme:light;
+  --surface-page:#f9f9f7;--surface-card:#fcfcfb;
+  --text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#898781;
+  --gridline:#e1e0d9;--baseline:#c3c2b7;--border:rgba(11,11,11,0.10);
+  --accent:#2563eb;--accent-wash:#2563eb1a;
+  --series-2:#16a34a;--series-3:#0d9488;--series-4:#dc2626;--bad:#dc2626;--amber:#d97706;--good:#0ca30c;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;
+  --deduct:#b4b2aa;
+  --radius:10px;--radius-btn:6px;--gap:16px;--fw:240px;
+  --th-bg:color-mix(in srgb, var(--series-3) 16%, var(--surface-card));
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --surface-page:#0d0d0d;--surface-card:#1a1a19;
+    --text-primary:#ffffff;--text-secondary:#c3c2b7;--text-muted:#898781;
+    --gridline:#2c2c2a;--baseline:#383835;--border:rgba(255,255,255,0.10);
+    --accent:#5b9bf7;--accent-wash:#5b9bf726;
+    --series-2:#4ade80;--series-3:#2dd4bf;--series-4:#f87171;--bad:#f87171;--amber:#fbbf24;--good:#0ca30c;
+    --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;
+    --deduct:#5b5a55;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --surface-page:#0d0d0d;--surface-card:#1a1a19;
+  --text-primary:#ffffff;--text-secondary:#c3c2b7;--text-muted:#898781;
+  --gridline:#2c2c2a;--baseline:#383835;--border:rgba(255,255,255,0.10);
+  --accent:#5b9bf7;--accent-wash:#5b9bf726;
+  --series-2:#4ade80;--series-3:#2dd4bf;--series-4:#f87171;--bad:#f87171;--amber:#fbbf24;--good:#0ca30c;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;
+  --deduct:#5b5a55;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--surface-page)}
+body{color:var(--text-primary);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:13px;line-height:1.55;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:9999px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+/* shell: filter rail + content */
+.wrap{display:grid;grid-template-columns:var(--fw) minmax(0,1fr);min-height:100vh;transition:grid-template-columns 180ms ease}
+aside{background:var(--surface-card);border-right:1px solid var(--border);align-self:stretch;min-width:0}
+.filters-inner{position:sticky;top:0;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column}
+.filter-dock-head{display:flex;align-items:center;gap:8px;padding:12px 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-primary)}
+.filter-dock-title{flex:1 1 auto}
+.filter-hide-btn{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:28px;height:28px;border-radius:var(--radius-btn);border:1px solid var(--border);background:var(--surface-card);color:var(--text-secondary);cursor:pointer;padding:0}
+.filter-hide-btn:hover{background:color-mix(in srgb, var(--accent) 10%, var(--surface-card));color:var(--text-primary)}
+.filter-hide-btn svg{transition:transform 140ms ease}
+.sidebar-filters{padding:2px 16px 16px}
+.wrap.filters-hidden{grid-template-columns:52px minmax(0,1fr);--fw:52px}
+.filters-hidden .sidebar-filters{display:none}
+.filters-hidden .filter-dock-head{flex-direction:column;align-items:center;gap:14px;padding:14px 0 8px}
+.filters-hidden .filter-dock-title{flex:none;writing-mode:vertical-rl;transform:rotate(180deg);color:var(--text-muted);letter-spacing:0.14em;cursor:pointer;user-select:none}
+.filters-hidden .filter-dock-title:hover{color:var(--text-primary)}
+.filters-hidden .filter-hide-btn{order:-1;border-color:color-mix(in srgb, var(--text-primary) 55%, transparent);color:var(--text-primary)}
+.filters-hidden .filter-hide-btn svg{transform:rotate(180deg)}
+
+.apply-btn,.clear-btn{width:100%;padding:6px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:8px}
+.apply-btn{border:1px solid var(--border);background:var(--surface-card);color:var(--text-muted)}
+.apply-btn:disabled{cursor:default;opacity:.6}
+.apply-btn.dirty{background:var(--accent);border-color:var(--accent);color:#fff;opacity:1}
+.clear-btn{margin-bottom:14px;background:color-mix(in srgb, var(--bad) 12%, var(--surface-card));border:1px solid color-mix(in srgb, var(--bad) 30%, var(--border));color:var(--bad)}
+.filter-group{margin-bottom:8px;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.filter-group h4{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.filter-group h4>span:first-child{flex:1;min-width:0}
+.filter-group h4 .count{color:var(--accent);font-weight:400;text-transform:none;letter-spacing:0}
+.filter-group h4::after{content:'';width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--text-muted);transition:transform .12s;flex-shrink:0}
+.filter-group.open h4::after{transform:rotate(180deg)}
+.filter-group .fg-body{display:none;margin-top:6px}
+.filter-group.open .fg-body{display:block}
+.filter-group .fg-hint{font-size:11px;color:var(--text-muted);margin:0 0 6px;line-height:1.35}
+.filter-search{width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:5px;margin-bottom:6px;background:var(--surface-card);color:var(--text-primary)}
+.filter-list{max-height:180px;overflow-y:auto;font-size:12px}
+.filter-list label{display:flex;align-items:center;gap:6px;padding:2px 0;border-radius:5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filter-list label:hover{background:color-mix(in srgb, var(--accent) 10%, transparent)}
+.filter-list label.fl-all{font-weight:700}
+.filter-list .fl-divider{height:1px;background:var(--gridline);margin:4px 2px 6px}
+.filter-list input{flex-shrink:0;accent-color:var(--accent)}
+.filter-list .only{margin-left:auto;font-size:10.5px;color:var(--accent);visibility:hidden;padding:0 4px}
+.filter-list label:hover .only{visibility:visible}
+
+/* content column */
+main{min-width:0;background:var(--surface-page)}
+.content-inner{max-width:1320px;width:100%;padding:20px 24px 60px;margin:0 auto;container-type:inline-size}
+.dash-header{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px}
+.dash-header .header-title{flex:1 1 320px;min-width:0}
+.dash-header h1{font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.01em;color:var(--text-primary)}
+.dash-header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+.unit-switch{display:flex;align-items:center;gap:8px}
+.unit-switch>span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface-card);padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text-secondary);font-weight:600}
+.seg button.active{background:var(--accent);color:#fff}
+.theme-toggle{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;background:var(--surface-card);border:1px solid var(--border);border-radius:10px;cursor:pointer;color:var(--text-primary);flex-shrink:0}
+.theme-toggle:hover{background:color-mix(in srgb, var(--accent) 10%, var(--surface-card))}
+.workspace-chip{display:flex;align-items:center;gap:8px;background:var(--surface-card);border:1px solid var(--border);border-radius:10px;padding:5px 10px 5px 6px;cursor:pointer;position:relative;flex-shrink:0}
+.workspace-chip:hover{background:color-mix(in srgb, var(--accent) 10%, var(--surface-card))}
+.workspace-icon{width:26px;height:26px;border-radius:6px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.workspace-text{display:flex;flex-direction:column;line-height:1.2}
+.workspace-caption{font-size:9.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted)}
+.workspace-name{font-size:13px;font-weight:700;color:var(--text-primary)}
+.workspace-chevron{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--text-muted);margin-left:4px;transition:transform .12s}
+.workspace-chip.open .workspace-chevron{transform:rotate(180deg)}
+.workspace-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--surface-card);border:1px solid var(--border);border-radius:8px;padding:6px;min-width:180px;box-shadow:0 10px 28px rgba(0,0,0,0.18);z-index:50}
+.workspace-chip.open .workspace-menu{display:block}
+.workspace-menu button{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--text-primary);cursor:pointer}
+.workspace-menu button:hover{background:color-mix(in srgb, var(--accent) 10%, transparent)}
+.workspace-menu button.active{background:var(--accent-wash);color:var(--accent);font-weight:700}
+.workspace-menu .ws-icon{width:22px;height:22px;border-radius:4px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.refresh-chip{--refresh-state:var(--good);display:inline-flex;align-items:center;gap:14px;margin-top:12px;padding:7px 14px 7px 7px;background:var(--surface-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 4px 14px -6px rgba(0,0,0,0.08);max-width:100%;flex-wrap:wrap}
+.refresh-badge{width:36px;height:36px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--refresh-state);background:color-mix(in srgb, var(--refresh-state) 12%, var(--surface-card))}
+.refresh-seg{display:flex;flex-direction:column;line-height:1.25}
+.refresh-seg+.refresh-seg{padding-left:14px;border-left:1px solid var(--border)}
+.refresh-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted)}
+.refresh-time{font-size:13.5px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;white-space:nowrap;margin-top:1px}
+.refresh-pill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:11.5px;font-weight:600;color:var(--refresh-state);padding:4px 10px 4px 8px;border-radius:999px;background:color-mix(in srgb, var(--refresh-state) 12%, transparent)}
+.refresh-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--refresh-state)}
+.refresh-chip.is-masked{--refresh-state:var(--accent)}
+.refresh-chip.is-actual{--refresh-state:var(--amber)}
+
+.tabs{display:flex;gap:2px;flex-wrap:wrap;width:fit-content;max-width:100%;margin:0 auto 20px;background:var(--surface-card);border:1px solid var(--border);border-radius:8px;padding:3px}
+.tabs button{font-size:13px;padding:6px 14px;border:none;border-radius:6px;background:transparent;color:var(--text-secondary);cursor:pointer;white-space:nowrap}
+.tabs button.on{background:var(--accent);color:#fff}
+.tabs button:hover:not(.on){color:var(--text-primary)}
+.tab{display:none}.tab.on{display:block}
+
+.inputrow{display:flex;align-items:flex-end;gap:16px 24px;margin-bottom:16px;flex-wrap:wrap}
+.active-filters{font-size:12px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.af-chip{background:var(--accent-wash);color:var(--text-primary);border-radius:999px;padding:2px 10px;font-size:11.5px}
+.toolbar-end{margin-left:auto;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.dlbtn{font-size:13px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;border:1px solid var(--accent);white-space:nowrap}
+.dlbtn:hover{background:color-mix(in srgb, var(--accent) 85%, var(--text-primary))}
+.dlbtn.secondary{background:var(--surface-card);color:var(--text-secondary);border-color:var(--border)}
+.dlbtn.secondary:hover{background:color-mix(in srgb, var(--accent) 10%, var(--surface-card));color:var(--text-primary)}
+
+/* KPI tiles */
+.kpi-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+@container (min-width:700px){.kpi-row{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@container (min-width:1060px){.kpi-row{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.kpi-tile{--kpi:var(--accent);position:relative;overflow:hidden;background:color-mix(in srgb, var(--kpi) 6%, var(--surface-card));border:1px solid color-mix(in srgb, var(--kpi) 22%, var(--border));border-radius:var(--radius);padding:16px 14px 14px;min-width:0}
+.kpi-tile::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:var(--kpi)}
+.kpi-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;color:var(--text-secondary);margin-bottom:6px;line-height:1.3}
+.kpi-label::before{content:'';width:8px;height:8px;border-radius:2px;background:var(--kpi);flex-shrink:0}
+.kpi-value{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;line-height:1.2;white-space:nowrap}
+.kpi-sub{font-size:12px;margin-top:4px;color:var(--text-muted)}
+
+/* panels */
+.panel{background:var(--surface-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:var(--gap);overflow:hidden;min-width:0}
+.panel>h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 14px;margin:0;border-bottom:1px solid var(--border);background:var(--accent-wash);font-size:14px;font-weight:600;color:var(--text-primary);cursor:pointer;user-select:none;transition:background .15s}
+.panel>h2:hover{background:var(--surface-card)}
+.panel>h2 .hint{font-size:12px;font-weight:400;color:var(--text-muted)}
+.panel>h2::after{content:'Collapse';margin-left:auto;font-size:11px;font-weight:500;color:var(--text-muted);order:3}
+.panel>h2 .csvbtn{margin-left:auto;order:2;font-size:11px;font-weight:600;padding:2px 9px;border-radius:5px;border:1px solid var(--border);background:var(--surface-card);color:var(--text-secondary);cursor:pointer}
+.panel>h2 .csvbtn:hover{color:var(--text-primary);border-color:var(--accent)}
+.panel>h2 .csvbtn~*{order:3}
+.panel>h2:has(.csvbtn)::after{margin-left:6px}
+.panel.collapsed>h2::after{content:'Expand'}
+.panel.collapsed>h2{border-bottom-color:transparent}
+.panel>:not(h2){margin:14px}
+.panel.collapsed>:not(h2){display:none}
+.panel>.tblscroll{margin:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--gap)}
+.grid2>.panel{margin-bottom:var(--gap)}
+.chartbox{position:relative;height:300px}
+.panel-note{font-size:12px;color:var(--text-muted);margin:0 0 14px}
+
+/* tables */
+.tblscroll{max-height:70vh;overflow:auto}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--gridline);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;z-index:1;background:var(--surface-card)}
+th.l,td.l{text-align:left}
+th{position:sticky;top:0;z-index:4;background:var(--th-bg);color:var(--series-3);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;cursor:pointer;user-select:none}
+th:first-child{z-index:5;background:var(--th-bg)}
+th.asc::after{content:' ↑'}th.desc::after{content:' ↓'}
+tbody tr:hover td{background:color-mix(in srgb, var(--accent) 6%, var(--surface-card))}
+tbody tr.sel td{background:var(--accent-wash)}
+.clickable tbody tr{cursor:pointer}
+.totalrow td{font-weight:700;border-top:2px solid var(--border);background:var(--surface-card)}
+.tblscroll .totalrow td{position:sticky;bottom:0;z-index:2;box-shadow:0 -1px 0 var(--border)}
+.tblscroll .totalrow td:first-child{z-index:3}
+td.na,.na{color:var(--text-muted)}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;line-height:1.3}
+.pill-pos{background:color-mix(in srgb, var(--good) 18%, transparent);color:var(--good)}
+.pill-neg{background:color-mix(in srgb, var(--series-4) 18%, transparent);color:var(--series-4)}
+.empty{color:var(--text-muted);padding:20px;text-align:center}
+.health-list{list-style:none;padding:0}
+.health-list li{padding:9px 0;border-bottom:1px solid var(--gridline)}
+.health-list .det{display:block;color:var(--text-muted);font-size:12px;margin-top:2px}
+.foot{color:var(--text-muted);font-size:12px;margin-top:28px;line-height:1.6;padding-top:14px;border-top:1px solid var(--border)}
+.search-in{font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-card);color:var(--text-primary);min-width:240px}
+
+/* mobile: rail goes off-canvas */
+.mobile-menu-toggle{display:none;position:fixed;bottom:20px;right:20px;z-index:40;width:50px;height:50px;border-radius:25px;background:var(--accent);border:none;box-shadow:0 4px 12px rgba(0,0,0,0.2);align-items:center;justify-content:center;cursor:pointer;color:#fff}
+.mobile-scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:25}
+.mobile-scrim.show{display:block}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:768px){
+  .wrap,.wrap.filters-hidden{grid-template-columns:minmax(0,1fr)}
+  aside{position:fixed;left:0;top:0;bottom:0;width:260px;transform:translateX(-100%);transition:transform 180ms ease;z-index:30;overflow-y:auto}
+  aside.open{transform:translateX(0)}
+  .filters-inner{position:static;max-height:none}
+  .filter-hide-btn{display:none}
+  .filters-hidden .sidebar-filters{display:revert}
+  .filters-hidden .filter-dock-head{flex-direction:row;padding:12px 16px 8px}
+  .filters-hidden .filter-dock-title{writing-mode:horizontal-tb;transform:none;color:var(--text-primary);letter-spacing:0.07em;cursor:default}
+  .mobile-menu-toggle{display:flex}
+  .content-inner{padding:16px}
+  .search-in{min-width:0;width:100%}
+}
+</style>
+</head>
+<body>
+<button type="button" class="mobile-menu-toggle" id="mobileMenuBtn" aria-label="Open filters">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+</button>
+<div class="mobile-scrim" id="mobileScrim"></div>
+<div class="wrap" id="wrap">
+<aside id="rail">
+ <div class="filters-inner">
+  <div class="filter-dock-head">
+    <span class="filter-dock-title" id="railTitle">Filters</span>
+    <button type="button" class="filter-hide-btn" id="railToggle" aria-expanded="true" title="Hide filters">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+  </div>
+  <div class="sidebar-filters">
+    <button type="button" class="apply-btn" id="applyBtn" disabled>Apply filters</button>
+    <button type="button" class="clear-btn" id="resetBtn">Clear all</button>
+    <div id="fHost"></div>
+  </div>
+ </div>
+</aside>
+<main>
+ <div class="content-inner">
+  <header class="dash-header">
+    <div class="header-title">
+      <h1>MIS Sales Dashboard</h1>
+      <p>GMV, sales and COGS for mCaffeine &amp; Hyphen across channels, from the monthly Sales, Prod, Samples and Secondary dumps</p>
+      <div class="refresh-chip is-masked" id="refreshChip">
+        <span class="refresh-badge" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>
+        </span>
+        <span class="refresh-seg"><span class="refresh-label">Data through</span><span class="refresh-time" id="asof"></span></span>
+        <span class="refresh-seg"><span class="refresh-label">Last refresh</span><span class="refresh-time" id="builtAt"></span></span>
+        <span class="refresh-pill" id="maskPill"><span class="refresh-dot" aria-hidden="true"></span><span id="maskText"></span></span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="unit-switch"><span>Units</span>
+        <span class="seg" id="unitSeg"><button type="button" data-unit="1">₹</button><button type="button" data-unit="100000">₹L</button><button type="button" data-unit="10000000" class="active">₹Cr</button></span>
+      </div>
+      <button type="button" class="theme-toggle" id="themeBtn" title="Toggle light/dark mode"><svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <div class="workspace-chip" id="workspaceChip" role="button" tabindex="0" aria-haspopup="true">
+        <span class="workspace-icon" id="wsIcon">AB</span>
+        <span class="workspace-text"><span class="workspace-caption">Workspace</span><span class="workspace-name" id="wsName">All Brands</span></span>
+        <span class="workspace-chevron"></span>
+        <div class="workspace-menu" id="wsMenu"></div>
+      </div>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+
+  <section class="tab" id="tab-overview">
+    <div class="kpi-row" id="ovKpis"></div>
+    <div class="inputrow"><div class="active-filters" id="afOverview"></div>
+      <div class="toolbar-end"><button type="button" class="dlbtn secondary" data-pnlcsv>Export filtered P&amp;L data (CSV)</button><button type="button" class="dlbtn secondary" data-tabcsv="overview">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>GMV to gross margin <span class="hint">selected period; grey bars are deductions</span></h2><div class="chartbox"><canvas id="cBridge"></canvas></div></div>
+      <div class="panel"><h2>Monthly trend <span class="hint">Net GMV, Net Sales and Gross Margin</span></h2><div class="chartbox"><canvas id="cTrend"></canvas></div></div>
+    </div>
+    <div class="panel"><h2>Monthly P&amp;L <span class="hint">Net GMV = GMV − RTO · Net Sales = Final Sales − Tax · Gross Margin = Net Sales − COGS − Samples</span><button class="csvbtn" data-csv="tOvMonthly">CSV</button></h2><div class="tblscroll" id="tOvMonthly"></div></div>
+  </section>
+
+  <section class="tab" id="tab-channels">
+    <div class="inputrow"><div class="active-filters" id="afChannels"></div><div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="channels">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>Net GMV by channel <span class="hint">selected period</span></h2><div class="chartbox" id="bxChBar"><canvas id="cChBar"></canvas></div></div>
+      <div>
+        <div class="panel"><h2>Channel group rollup <span class="hint">share of Net GMV</span><button class="csvbtn" data-csv="tChGroup">CSV</button></h2><div class="tblscroll" id="tChGroup"></div></div>
+        <div class="panel"><h2>Net GMV by month <span class="hint">MoM = latest month vs the one before</span><button class="csvbtn" data-csv="tChMoM">CSV</button></h2><div class="tblscroll" id="tChMoM"></div></div>
+      </div>
+    </div>
+    <div class="panel"><h2>Channel P&amp;L <span class="hint">click a column to sort</span><button class="csvbtn" data-csv="tChPL">CSV</button></h2><div class="tblscroll" id="tChPL"></div></div>
+  </section>
+
+  <section class="tab" id="tab-brands">
+    <div class="inputrow"><div class="active-filters" id="afBrands"></div><div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="brands">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>Net GMV by brand and month <span class="hint">stacked</span></h2><div class="chartbox"><canvas id="cBrStack"></canvas></div></div>
+      <div class="panel"><h2>Brand P&amp;L <span class="hint">selected period</span><button class="csvbtn" data-csv="tBrPL">CSV</button></h2><div class="tblscroll" id="tBrPL"></div></div>
+    </div>
+    <div class="panel"><h2>Brand × channel <span class="hint">Net GMV and each brand's share of the channel</span><button class="csvbtn" data-csv="tBrMx">CSV</button></h2><div class="tblscroll" id="tBrMx"></div></div>
+  </section>
+
+  <section class="tab" id="tab-gmv">
+    <div class="inputrow"><div class="active-filters" id="afGmv"></div><div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="gmv">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>Leakage ratios by month <span class="hint">RTO % and Discount % of GMV, Dealer Margin % of Net GMV</span></h2><div class="chartbox"><canvas id="cGsLines"></canvas></div></div>
+      <div class="panel"><h2>Realisation by channel <span class="hint">Net Sales as % of Gross GMV</span></h2><div class="chartbox" id="bxGsReal"><canvas id="cGsReal"></canvas></div></div>
+    </div>
+    <div class="panel"><h2>GMV to Net Sales bridge by channel <span class="hint">every deduction between Gross GMV and Net Sales</span><button class="csvbtn" data-csv="tGsBridge">CSV</button></h2><div class="tblscroll" id="tGsBridge"></div></div>
+    <div class="panel"><h2>Bridge by month <button class="csvbtn" data-csv="tGsMonth">CSV</button></h2><div class="tblscroll" id="tGsMonth"></div></div>
+  </section>
+
+  <section class="tab" id="tab-cogs">
+    <div class="kpi-row" id="cgKpis"></div>
+    <div class="inputrow"><div class="active-filters" id="afCogs"></div><div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="cogs">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>COGS components by month <span class="hint">RM, PM, Shrink, Shipper, Job Work</span></h2><div class="chartbox"><canvas id="cCgStack"></canvas></div></div>
+      <div class="panel"><h2>COGS % of Net Sales by channel <span class="hint">selected period</span></h2><div class="chartbox" id="bxCgPct"><canvas id="cCgPct"></canvas></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>COGS by channel <button class="csvbtn" data-csv="tCgCh">CSV</button></h2><div class="tblscroll" id="tCgCh"></div></div>
+      <div class="panel"><h2>COGS by category <span class="hint">Category filter applies</span><button class="csvbtn" data-csv="tCgCat">CSV</button></h2><div class="tblscroll" id="tCgCat"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>Samples, compensation &amp; marketing cost <span class="hint">Samples dump; Dump type filter does not apply</span><button class="csvbtn" data-csv="tCgSmp">CSV</button></h2><div class="tblscroll" id="tCgSmp"></div></div>
+      <div class="panel"><h2>Samples cost by channel <button class="csvbtn" data-csv="tCgSmpCh">CSV</button></h2><div class="tblscroll" id="tCgSmpCh"></div></div>
+    </div>
+    <div class="panel"><h2>Top 50 SKUs by COGS <span class="hint">channel filter applies at channel-group level</span><button class="csvbtn" data-csv="tCgSku">CSV</button></h2><div class="tblscroll" id="tCgSku"></div></div>
+  </section>
+
+  <section class="tab" id="tab-product">
+    <div class="inputrow"><div class="active-filters" id="afProduct"></div>
+      <input type="search" class="search-in" id="pdSearch" placeholder="Search SKU code or name…" aria-label="Search SKUs">
+      <div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="product">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>Category <span class="hint">click a row to drill in</span><button class="csvbtn" data-csv="tPdCat">CSV</button></h2><div class="tblscroll clickable" id="tPdCat"></div></div>
+      <div class="panel"><h2>Sub-category <span class="hint" id="pdCatName"></span><button class="csvbtn" data-csv="tPdSub">CSV</button></h2><div class="tblscroll clickable" id="tPdSub"></div></div>
+    </div>
+    <div class="panel"><h2>SKUs <span class="hint">top 500 by Net GMV; channel filter applies at channel-group level</span><button class="csvbtn" data-csv="tPdSku">CSV</button></h2><div class="tblscroll" id="tPdSku"></div></div>
+  </section>
+
+  <section class="tab" id="tab-secondary">
+    <div class="kpi-row" id="scKpis"></div>
+    <div class="inputrow"><div class="active-filters" id="afSecondary"></div><div class="toolbar-end"><button type="button" class="dlbtn secondary" data-tabcsv="secondary">Export tab (CSV)</button></div></div>
+    <div class="grid2">
+      <div class="panel"><h2>Sell-in vs sell-through by month <span class="hint">primary Net GMV vs secondary GMV, channels reporting secondary</span></h2><div class="chartbox"><canvas id="cScTrend"></canvas></div></div>
+      <div class="panel"><h2>Secondary GMV by channel <span class="hint">selected period</span></h2><div class="chartbox" id="bxScBar"><canvas id="cScBar"></canvas></div></div>
+    </div>
+    <div class="panel"><h2>Secondary sales by channel <span class="hint">Net = GMV − Margin − Tax · Sell-through = Secondary GMV ÷ Primary Net GMV · never added to primary totals</span><button class="csvbtn" data-csv="tScCh">CSV</button></h2><div class="tblscroll" id="tScCh"></div></div>
+    <div class="panel"><h2>Secondary sales by month <button class="csvbtn" data-csv="tScMonth">CSV</button></h2><div class="tblscroll" id="tScMonth"></div></div>
+    <div class="panel"><h2>Top 50 SKUs in secondary sales <button class="csvbtn" data-csv="tScSku">CSV</button></h2><div class="tblscroll" id="tScSku"></div></div>
+  </section>
+
+  <section class="tab" id="tab-health">
+    <div class="panel"><h2>Data health <span class="hint" id="hMeta"></span></h2><ul class="health-list" id="hList"></ul></div>
+  </section>
+
+  <div class="foot" id="foot"></div>
+ </div>
+</main>
+</div>
+
+<script src="data.js"></script>
+<script>
+(() => {
+const D = window.MIS_DATA;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ── decode the dictionary-encoded cubes ── */
+const groupOf = {};
+D.dicts.channel.forEach((c, i) => groupOf[c] = D.channel_group_of[i]);
+const skuInfo = {};
+D.dicts.sku.forEach((k, i) => skuInfo[k] = D.sku_info[i] || ["", "Unmapped", "Unmapped"]);
+function decode(cube) {
+  const nd = cube.dims.length;
+  return cube.rows.map(r => {
+    const o = {};
+    cube.dims.forEach((d, i) => o[d] = D.dicts[d][r[i]]);
+    cube.measures.forEach((m, j) => o[m] = r[nd + j]);
+    if (o.channel && !o.channel_group) o.channel_group = groupOf[o.channel] || "Other";
+    if (o.sku && !o.category) o.category = (skuInfo[o.sku] || [])[1] || "Unmapped";
+    return o;
+  });
+}
+const PNL = decode(D.pnl), CAT = decode(D.cat), SKU = decode(D.sku), SMP = decode(D.samples), SEC = decode(D.secondary);
+
+const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const mLabel = (m) => MN[+m.slice(5, 7) - 1] + "-" + m.slice(2, 4);
+const ordered = (vals, first) => first.filter(v => vals.includes(v)).concat(vals.filter(v => !first.includes(v)).sort());
+const MONTHS = D.meta.months;
+const BRAND_ORDER = ["mCaffeine", "Hyphen", "DND"];
+
+/* ── filter dimensions (rail) ── */
+const FK = {
+  month: { label: "Month", opts: MONTHS, show: mLabel },
+  dump_type: { label: "Dump type", opts: ordered(D.dicts.dump_type, ["Internal", "Reco", "Others"]), def: D.meta.headline_dump_types,
+    hint: "Internal + Reco match the MIS. Others = B2B adjustment rows. Not used by Samples or Secondary." },
+  brand: { label: "Brand", opts: ordered(D.dicts.brand, BRAND_ORDER) },
+  channel_group: { label: "Channel group", opts: ordered([...new Set(D.channel_group_of)], ["D2C", "Marketplace", "Quick Commerce", "B2B / Modern Trade", "Institutional"]) },
+  channel: { label: "Channel", opts: [...D.dicts.channel].sort() },
+  category: { label: "Category", opts: ordered(D.dicts.category, []), hint: "Applies to category, SKU and secondary SKU views; P&L totals are not split by category." },
+  sample_type: { label: "Sample type", opts: ordered(D.dicts.sample_type, ["Samples", "Compensation", "Marketing", "ATL"]), hint: "Samples cost only." },
+};
+const sel = {}, pend = {};
+const defaults = (k) => new Set(FK[k].def ? FK[k].def.filter(v => FK[k].opts.includes(v)) : FK[k].opts);
+Object.keys(FK).forEach(k => { sel[k] = defaults(k); pend[k] = new Set(sel[k]); });
+
+const S = { unit: 1e7, tab: (location.hash || "#overview").slice(1), cat: null, sub: null, search: "" };
+
+/* ── formatting ── */
+const nf = (v) => Math.round(v).toLocaleString("en-IN");
+const div = (a, b) => (b ? a / b : null);
+function money(v) {
+  if (v == null || !isFinite(v)) return "–";
+  if (S.unit === 1) return (v < 0 ? "-₹" : "₹") + nf(Math.abs(v));
+  const s = (Math.abs(v) / S.unit).toFixed(2);
+  return (v < 0 ? "-₹" : "₹") + s + (S.unit === 1e7 ? " Cr" : " L");
+}
+function compact(v) { if (v < 0) return "-" + compact(-v); return v >= 1e7 ? +(v / 1e7).toFixed(2) + "Cr" : v >= 1e5 ? +(v / 1e5).toFixed(1) + "L" : v >= 1e3 ? +(v / 1e3).toFixed(1) + "K" : (+v.toFixed(2)).toString(); }
+const moneyShort = (v) => (v < 0 ? "-₹" : "₹") + compact(Math.abs(v));
+const pct = (v, d = 1) => (v == null || !isFinite(v) ? "–" : (v * 100).toFixed(d) + "%");
+const unitLabel = () => (S.unit === 1 ? "₹" : S.unit === 1e5 ? "₹ Lakh" : "₹ Crore");
+
+/* ── filtering ── */
+const isAll = (k) => sel[k].size === FK[k].opts.length;
+function keep(r) {
+  for (const k of Object.keys(FK)) {
+    if (r[k] === undefined || isAll(k)) continue;
+    if (!sel[k].has(r[k])) return false;
+  }
+  // cubes without a channel column (SKU cube) follow the channel selection at group level
+  if (r.channel === undefined && r.channel_group !== undefined && !isAll("channel")) {
+    const gs = new Set([...sel.channel].map(c => groupOf[c]));
+    if (!gs.has(r.channel_group)) return false;
+  }
+  return true;
+}
+const PNL_M = ["gmv","discount","dealer_margin","rto","net_gmv","final_sales","tax","units","rm","pm","shrink","shipper","jw"];
+const PROD_M = ["net_gmv","final_sales","tax","units","rm","pm","shrink","shipper","jw"];
+const SEC_M = ["gmv","units","margin","tax","rm","pm","shrink","shipper","jw"];
+function sum(rows, ms) { const o = {}; ms.forEach(m => o[m] = 0); rows.forEach(r => ms.forEach(m => o[m] += r[m] || 0)); return o; }
+function groupSum(rows, keyFn, ms) {
+  const map = new Map();
+  rows.forEach(r => { const k = keyFn(r); if (!map.has(k)) map.set(k, sum([], ms)); const o = map.get(k); ms.forEach(m => o[m] += r[m] || 0); });
+  return map;
+}
+function pl(s, samples = 0) {
+  const cogs = s.rm + s.pm + s.shrink + s.shipper + s.jw, ns = s.final_sales - s.tax, gm = ns - cogs - samples;
+  return Object.assign({}, s, { cogs, net_sales: ns, samples, gm, pmx: s.pm + s.shrink + s.shipper,
+    rto_pct: div(s.rto, s.gmv), disc_pct: div(s.discount, s.gmv), dm_pct: div(s.dealer_margin, s.net_gmv),
+    cogs_ns: div(cogs, ns), cogs_gmv: div(cogs, s.net_gmv), gm_pct: div(gm, ns), real: div(ns, s.gmv) });
+}
+function prodRow(s) { const c = s.rm + s.pm + s.shrink + s.shipper + s.jw, ns = s.final_sales - s.tax; return Object.assign({}, s, { cogs: c, net_sales: ns, cogs_ns: div(c, ns), asp: div(s.net_gmv, s.units), cpu: div(c, s.units) }); }
+function secRow(s) { const c = s.rm + s.pm + s.shrink + s.shipper + s.jw, net = s.gmv - s.margin - s.tax; return Object.assign({}, s, { cogs: c, net, margin_pct: div(s.margin, s.gmv), cogs_net: div(c, net) }); }
+const fPNL = () => PNL.filter(keep), fSMP = () => SMP.filter(keep), fSEC = () => SEC.filter(keep);
+const selMonths = () => MONTHS.filter(m => sel.month.has(m));
+const samplesBy = (keyFn) => { const m = new Map(); fSMP().forEach(r => m.set(keyFn(r), (m.get(keyFn(r)) || 0) + r.cogs)); return m; };
+const samplesTotal = () => fSMP().reduce((a, r) => a + r.cogs, 0);
+
+/* ── tables (sortable; every rendered table is kept for CSV export) ── */
+const C = {
+  text: (key, label) => ({ key, label, kind: "text" }),
+  money: (key, label) => ({ key, label, kind: "money" }),
+  pct: (key, label) => ({ key, label, kind: "pct" }),
+  num: (key, label) => ({ key, label, kind: "num" }),
+  rs: (key, label) => ({ key, label, kind: "rs" }),
+  delta: (key, label) => ({ key, label, kind: "delta" }),
+};
+function cell(c, v) {
+  switch (c.kind) {
+    case "money": return money(v);
+    case "pct": return pct(v);
+    case "num": return v == null ? "–" : nf(v);
+    case "rs": return v == null || !isFinite(v) ? "–" : "₹" + v.toFixed(1);
+    case "delta": return v == null || !isFinite(v) ? '<span class="na">–</span>' : `<span class="pill ${v >= 0 ? "pill-pos" : "pill-neg"}">${v >= 0 ? "+" : ""}${pct(v)}</span>`;
+    default: return esc(v);
+  }
+}
+const TBL = {}, sortState = {};
+function table(id, cols, rows, o = {}) {
+  const el = $(id);
+  const st = sortState[id] || (o.sort ? { key: o.sort, dir: "desc" } : null);
+  if (st) rows = rows.slice().sort((a, b) => {
+    const x = a[st.key], y = b[st.key];
+    const c = typeof x === "string" || typeof y === "string" ? String(x ?? "").localeCompare(String(y ?? "")) : (x ?? -Infinity) - (y ?? -Infinity);
+    return st.dir === "asc" ? c : -c;
+  });
+  if (o.limit) rows = rows.slice(0, o.limit);
+  TBL[id] = { cols, rows, total: o.total, title: el.closest(".panel").querySelector("h2").firstChild.textContent.trim() };
+  if (!rows.length) { el.innerHTML = '<p class="empty">No data for this selection</p>'; return; }
+  const th = cols.map((c, i) => `<th class="${c.kind === "text" && i ? "l" : ""} ${st && st.key === c.key ? st.dir : ""}" data-k="${c.key}" scope="col">${esc(c.label)}</th>`).join("");
+  const tr = (r, cls) => `<tr class="${cls}"${o.rowKey ? ` data-key="${esc(r[o.rowKey])}"` : ""}>` + cols.map((c, i) => `<td class="${c.kind === "text" && i ? "l" : ""}">${cell(c, r[c.key])}</td>`).join("") + "</tr>";
+  el.innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${rows.map(r => tr(r, o.selected != null && r[o.rowKey] === o.selected ? "sel" : "")).join("")}${o.total ? tr(o.total, "totalrow") : ""}</tbody></table>`;
+  el.querySelectorAll("th").forEach(h => h.onclick = () => {
+    const k = h.dataset.k, cur = sortState[id] || st;
+    sortState[id] = { key: k, dir: cur && cur.key === k && cur.dir === "desc" ? "asc" : "desc" };
+    render();
+  });
+  if (o.onRow) el.querySelectorAll("tbody tr[data-key]").forEach(r => r.onclick = () => o.onRow(r.dataset.key));
+}
+
+/* ── CSV export ── */
+const csvEsc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+function csvVal(c, v) {
+  if (v == null || (typeof v === "number" && !isFinite(v))) return "";
+  if (c.kind === "money" || c.kind === "num") return Math.round(v);
+  if (c.kind === "pct" || c.kind === "delta") return (v * 100).toFixed(2);
+  if (c.kind === "rs") return v.toFixed(2);
+  return v;
+}
+const csvHead = (c) => c.label + ((c.kind === "money" || c.kind === "rs") ? " (₹)" : (c.kind === "pct" || c.kind === "delta") && !c.label.includes("%") ? " (%)" : "");
+function tableCsv(id) {
+  const t = TBL[id]; if (!t) return "";
+  const lines = [t.cols.map(c => csvEsc(csvHead(c))).join(",")];
+  t.rows.concat(t.total ? [t.total] : []).forEach(r => lines.push(t.cols.map(c => csvEsc(csvVal(c, r[c.key]))).join(",")));
+  return lines.join("\n");
+}
+function filterNote() {
+  return Object.keys(FK).filter(k => !isAll(k)).map(k => `${FK[k].label}: ${[...sel[k]].map(v => FK[k].show ? FK[k].show(v) : v).join(" | ")}`).join("; ") || "No filters (all data)";
+}
+function download(name, text) {
+  const blob = new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const stamp = () => new Date().toISOString().slice(0, 10);
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+const preamble = () => `# MIS Sales Dashboard export ${stamp()} - ${D.meta.masked ? "indexed values" : "ACTUAL values - confidential"}\n# Filters: ${csvEsc(filterNote())}\n`;
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-csv]");
+  if (b) { e.stopPropagation(); const id = b.dataset.csv; download(`mis_${slug(TBL[id] ? TBL[id].title : id)}_${stamp()}.csv`, preamble() + tableCsv(id)); return; }
+  const t = e.target.closest("[data-tabcsv]");
+  if (t) {
+    const tab = t.dataset.tabcsv;
+    const ids = [...$("tab-" + tab).querySelectorAll(".tblscroll")].map(x => x.id).filter(id => TBL[id] && TBL[id].rows.length);
+    const kp = $("tab-" + tab).querySelector(".kpi-row");
+    let out = preamble();
+    if (kp) out += "\nKPIs\nMetric,Value,Note\n" + [...kp.querySelectorAll(".kpi-tile")].map(k => [k.querySelector(".kpi-label").textContent, k.querySelector(".kpi-value").textContent, k.querySelector(".kpi-sub").textContent].map(csvEsc).join(",")).join("\n") + "\n";
+    ids.forEach(id => out += `\n${csvEsc(TBL[id].title)}\n${tableCsv(id)}\n`);
+    download(`mis_${tab}_${stamp()}.csv`, out); return;
+  }
+  if (e.target.closest("[data-pnlcsv]")) {
+    const smp = samplesBy(r => r.month + "|" + r.brand + "|" + r.channel);
+    const cols = ["month","dump_type","brand","channel_group","channel"], ms = ["gmv","rto","net_gmv","discount","dealer_margin","final_sales","tax","net_sales","rm","pm","shrink","shipper","jw","cogs","units"];
+    const lines = [cols.concat(ms.map(m => m === "units" ? m : m + " (₹)")).concat(["samples_cost_month_brand_channel (₹, on Internal rows)"]).join(",")];
+    fPNL().forEach(r => { const p = pl(r); lines.push(cols.map(c => csvEsc(c === "month" ? mLabel(r.month) : r[c])).concat(ms.map(m => Math.round(p[m]))).concat([r.dump_type === "Internal" ? Math.round(smp.get(r.month + "|" + r.brand + "|" + r.channel) || 0) : ""]).join(",")); });
+    download(`mis_pnl_data_${stamp()}.csv`, preamble() + lines.join("\n"));
+  }
+});
+
+/* ── charts (Chart.js, styled like the LMD dashboard; colours read from tokens at draw time) ── */
+if (window.Chart) Chart.defaults.animation = false;
+const charts = {};
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const tok = (c) => (c && c.startsWith("--") ? cssVar(c) : c);
+function kill(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+function isLight(col) { const m = /^#([0-9a-f]{6})/i.exec(col); if (!m) return false; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 165; }
+const FMT = { inr: moneyShort, pct: (v) => v.toFixed(1) + "%" };
+const valueLabels = { id: "valueLabels", afterDatasetsDraw(chart) {
+  const { ctx } = chart, o = chart.options.plugins.valueLabels || {}; if (o.off) return;
+  const sets = chart.data.datasets, horiz = chart.options.indexAxis === "y";
+  ctx.save(); ctx.font = "600 10.5px Inter, system-ui, sans-serif";
+  sets.forEach((d, i) => {
+    const meta = chart.getDatasetMeta(i); if (meta.hidden || !chart.isDatasetVisible(i)) return;
+    const f = FMT[d.fmt || o.fmt] || FMT.inr;
+    meta.data.forEach((el, j) => {
+      let v = d.data[j]; if (Array.isArray(v)) { if (!o.floatLabels || !o.labelOnly || !o.labelOnly[j]) return; v = o.floatLabels[j]; }
+      if (v == null || isNaN(v) || v === 0) return;
+      if (d.type === "line") { ctx.fillStyle = d.borderColor; ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(f(v), el.x, el.y - 7); return; }
+      if (horiz) { ctx.fillStyle = cssVar("--text-primary"); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(f(v), el.x + 4, el.y); return; }
+      const w = el.width || 0, h = Math.abs(el.base - el.y);
+      ctx.textAlign = "center";
+      if (o.stacked) { if (h < 15 || w < 26) return; ctx.fillStyle = isLight(d.backgroundColor) ? "#0b3a3a" : "#ffffff"; ctx.textBaseline = "middle"; ctx.fillText(f(v), el.x, (el.y + el.base) / 2); }
+      else { if (w < 16) return; ctx.fillStyle = cssVar("--text-primary"); ctx.textBaseline = "bottom"; ctx.fillText(f(v), el.x, Math.min(el.y, el.base) - 4); }
+    });
+  });
+  ctx.restore();
+} };
+const tipStyle = () => ({ backgroundColor: cssVar("--text-primary"), titleColor: cssVar("--surface-card"), bodyColor: cssVar("--surface-card"),
+  titleFont: { family: "Inter", weight: "700", size: 11.5 }, bodyFont: { family: "Inter", size: 11.5 }, padding: { x: 11, y: 8 }, cornerRadius: 8,
+  boxWidth: 8, boxHeight: 8, boxPadding: 4, caretSize: 0, displayColors: true });
+const axStyle = () => ({ grid: { color: cssVar("--gridline") }, border: { display: false }, ticks: { color: cssVar("--text-muted"), font: { family: "Inter", size: 11 } } });
+const legendStyle = (show = true) => ({ display: show, position: "top", align: "start", labels: { color: cssVar("--text-secondary"), font: { family: "Inter", size: 11 }, boxWidth: 10, boxHeight: 10, padding: 10 } });
+/* drawBar(id, labels, datasets, o): datasets {label, data, type, color, fmt}; o {stacked, horizontal, fmt, floatLabels, colors} */
+function drawBar(id, labels, datasets, o = {}) {
+  kill(id); const c = $(id); if (!c || !c.offsetParent) return;
+  const AX = axStyle(), fmt = o.fmt || "inr";
+  if (o.horizontal) c.parentElement.style.height = Math.max(300, labels.length * 24 + 50) + "px";
+  datasets.forEach(d => {
+    const col = d.colors ? d.colors.map(tok) : tok(d.color || "--accent");
+    if (d.type === "line") Object.assign(d, { borderColor: col, backgroundColor: col, borderWidth: 2.25, tension: .3, pointRadius: 3.5, pointHoverRadius: 5, pointBackgroundColor: col, pointBorderColor: cssVar("--surface-card"), pointBorderWidth: 2 });
+    else Object.assign(d, { type: "bar", backgroundColor: col, borderColor: col, borderRadius: 2, maxBarThickness: o.horizontal ? 18 : 44, borderSkipped: false });
+  });
+  const valAx = { ...AX, beginAtZero: true, stacked: !!o.stacked, grace: o.stacked ? 0 : "12%", ticks: { ...AX.ticks, maxTicksLimit: 6, callback: v => (FMT[fmt])(v) } };
+  const catAx = { ...AX, stacked: !!o.stacked, grid: { display: false }, border: { display: true, color: cssVar("--baseline") }, ticks: { ...AX.ticks, autoSkip: false, maxRotation: o.horizontal ? 0 : 40 } };
+  const full = (v, d) => (d.fmt || fmt) === "pct" ? v.toFixed(1) + "%" : money(v);
+  const tip = { ...tipStyle(), callbacks: { label: ctx => {
+    const raw = ctx.raw; const v = Array.isArray(raw) ? (o.floatLabels ? o.floatLabels[ctx.dataIndex] : raw[1] - raw[0]) : (o.horizontal ? ctx.parsed.x : ctx.parsed.y);
+    return ` ${ctx.dataset.label}: ${full(v, ctx.dataset)}`; } } };
+  charts[id] = new Chart(c, { data: { labels, datasets }, plugins: [valueLabels],
+    options: { maintainAspectRatio: false, responsive: true, indexAxis: o.horizontal ? "y" : "x", interaction: { mode: "index", intersect: false }, layout: { padding: { top: 6, right: o.horizontal ? 56 : 0 } },
+      plugins: { legend: legendStyle(datasets.length > 1), tooltip: tip, valueLabels: { stacked: !!o.stacked, fmt, floatLabels: o.floatLabels, labelOnly: o.labelOnly } },
+      scales: o.horizontal ? { x: valAx, y: catAx } : { x: catAx, y: valAx } } });
+}
+const SER = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+const brandColor = (b) => SER[Math.max(0, BRAND_ORDER.indexOf(b))];
+
+/* ── KPI tiles ── */
+function kpis(id, tiles) {
+  $(id).innerHTML = tiles.map((t, i) => `<div class="kpi-tile" style="--kpi:var(${t.c || SER[i % 5]})"><div class="kpi-label">${t.k}</div><div class="kpi-value">${t.v}</div><div class="kpi-sub">${t.d || "&nbsp;"}</div></div>`).join("");
+}
+function momText(ml, k, isPct) {
+  if (ml.length < 2) return "";
+  const a = ml[ml.length - 1], b = ml[ml.length - 2];
+  if (isPct) { const d = (a[k] - b[k]) * 100; return isFinite(d) ? `<span class="pill ${d >= 0 ? "pill-pos" : "pill-neg"}">${d >= 0 ? "+" : ""}${d.toFixed(1)} pp</span> ${a.month} vs ${b.month}` : ""; }
+  const r = div(a[k] - b[k], Math.abs(b[k]));
+  return r == null || !isFinite(r) ? "" : `<span class="pill ${r >= 0 ? "pill-pos" : "pill-neg"}">${r >= 0 ? "+" : ""}${pct(r)}</span> ${a.month} vs ${b.month}`;
+}
+
+/* ── shared builders ── */
+function monthlyPL() {
+  const by = groupSum(fPNL(), r => r.month, PNL_M), smp = samplesBy(r => r.month);
+  return selMonths().map(m => Object.assign({ month: mLabel(m) }, pl(by.get(m) || sum([], PNL_M), smp.get(m) || 0)));
+}
+function plBy(keyFn, label) {
+  const rows = fPNL(), by = groupSum(rows, keyFn, PNL_M), smp = samplesBy(keyFn);
+  const tot = pl(sum(rows, PNL_M), samplesTotal());
+  const out = [...by].map(([k, s]) => Object.assign({ [label]: k }, pl(s, smp.get(k) || 0)));
+  out.forEach(r => r.share = div(r.net_gmv, tot.net_gmv));
+  return { out, tot: Object.assign({ [label]: "Total", share: 1 }, tot) };
+}
+const PL_COLS = [C.money("gmv", "Gross GMV"), C.pct("rto_pct", "RTO %"), C.money("net_gmv", "Net GMV"), C.pct("share", "Share"), C.pct("disc_pct", "Disc %"),
+  C.pct("dm_pct", "DM %"), C.money("final_sales", "Final Sales"), C.money("tax", "Tax"), C.money("net_sales", "Net Sales"), C.money("cogs", "COGS"), C.pct("cogs_ns", "COGS % NS"),
+  C.money("samples", "Samples"), C.money("gm", "Gross Margin"), C.pct("gm_pct", "GM %"), C.num("units", "Units")];
+
+/* ── pages ── */
+function renderOverview() {
+  const tot = pl(sum(fPNL(), PNL_M), samplesTotal()), ml = monthlyPL();
+  kpis("ovKpis", [
+    { k: "Gross GMV", v: money(tot.gmv), d: momText(ml, "gmv") },
+    { k: "Net GMV (GMV − RTO)", v: money(tot.net_gmv), d: momText(ml, "net_gmv") },
+    { k: "Final Sales (incl. GST)", v: money(tot.final_sales), d: momText(ml, "final_sales") },
+    { k: "Net Sales (ex-GST)", v: money(tot.net_sales), d: momText(ml, "net_sales") },
+    { k: "COGS", v: money(tot.cogs), d: momText(ml, "cogs") },
+    { k: "COGS % of Net Sales", v: pct(tot.cogs_ns), d: momText(ml, "cogs_ns", true) },
+    { k: "Samples cost", v: money(tot.samples), d: momText(ml, "samples") },
+    { k: "Gross Margin", v: money(tot.gm), d: momText(ml, "gm") },
+    { k: "GM % of Net Sales", v: pct(tot.gm_pct), d: momText(ml, "gm_pct", true) },
+    { k: "Units", v: nf(tot.units), d: momText(ml, "units") },
+  ]);
+  const steps = [["Gross GMV", tot.gmv, 1], ["RTO", -tot.rto], ["Net GMV", tot.net_gmv, 1], ["Discount", -tot.discount], ["Dealer margin", -tot.dealer_margin],
+    ["Final Sales", tot.final_sales, 1], ["Tax", -tot.tax], ["Net Sales", tot.net_sales, 1], ["COGS", -tot.cogs], ["Samples", -tot.samples], ["Gross Margin", tot.gm, 1]];
+  let run = 0; const data = [], colors = [], labels = [];
+  steps.forEach(([n, v, t]) => { if (t) { data.push([0, v]); run = v; colors.push("--s1"); } else { data.push([run + v, run]); run += v; colors.push("--deduct"); } labels.push(v); });
+  // label the subtotal bars only; deductions are read from the tooltip and the table below
+  drawBar("cBridge", steps.map(s => s[0]), [{ label: "Value", data, colors }], { floatLabels: labels, labelOnly: steps.map(s => !!s[2]) });
+  drawBar("cTrend", ml.map(r => r.month), [["Net GMV", "net_gmv"], ["Net Sales", "net_sales"], ["Gross Margin", "gm"]].map(([l, k], i) => ({ label: l, data: ml.map(r => r[k]), color: SER[i] })));
+  table("tOvMonthly", [C.text("month", "Month")].concat(PL_COLS.filter(c => c.key !== "share")), ml, { total: Object.assign({ month: "Total" }, tot) });
+}
+
+function renderChannels() {
+  const { out, tot } = plBy(r => r.channel, "channel");
+  out.forEach(r => r.group = groupOf[r.channel] || "Other");
+  const s = out.slice().sort((a, b) => b.net_gmv - a.net_gmv);
+  drawBar("cChBar", s.map(r => r.channel), [{ label: "Net GMV", data: s.map(r => r.net_gmv), color: "--s1" }], { horizontal: true });
+  table("tChPL", [C.text("channel", "Channel"), C.text("group", "Group")].concat(PL_COLS), out, { sort: "net_gmv", total: Object.assign({ group: "" }, tot) });
+  const g = plBy(r => r.channel_group, "group");
+  table("tChGroup", [C.text("group", "Channel group"), C.money("net_gmv", "Net GMV"), C.pct("share", "Share"), C.pct("rto_pct", "RTO %"), C.money("net_sales", "Net Sales"),
+    C.pct("cogs_ns", "COGS % NS"), C.pct("gm_pct", "GM %")], g.out, { sort: "net_gmv", total: g.tot });
+  const ms = selMonths(), by = groupSum(fPNL(), r => r.channel + "|" + r.month, ["net_gmv"]);
+  const rows = out.map(r => { const o = { channel: r.channel }; ms.forEach(m => o[m] = (by.get(r.channel + "|" + m) || { net_gmv: 0 }).net_gmv);
+    o.mom = ms.length > 1 ? div(o[ms[ms.length - 1]] - o[ms[ms.length - 2]], Math.abs(o[ms[ms.length - 2]])) : null; return o; });
+  const tr = { channel: "Total" }; ms.forEach(m => tr[m] = rows.reduce((a, r) => a + r[m], 0));
+  tr.mom = ms.length > 1 ? div(tr[ms[ms.length - 1]] - tr[ms[ms.length - 2]], Math.abs(tr[ms[ms.length - 2]])) : null;
+  table("tChMoM", [C.text("channel", "Channel")].concat(ms.map(m => C.money(m, mLabel(m)))).concat([C.delta("mom", "MoM")]), rows, { sort: ms[ms.length - 1], total: tr });
+}
+
+function renderBrands() {
+  const ms = selMonths(), by = groupSum(fPNL(), r => r.brand + "|" + r.month, ["net_gmv"]);
+  const brands = FK.brand.opts.filter(b => sel.brand.has(b));
+  drawBar("cBrStack", ms.map(mLabel), brands.map(b => ({ label: b, data: ms.map(m => (by.get(b + "|" + m) || { net_gmv: 0 }).net_gmv), color: brandColor(b) })), { stacked: true });
+  const { out, tot } = plBy(r => r.brand, "brand");
+  table("tBrPL", [C.text("brand", "Brand"), C.money("net_gmv", "Net GMV"), C.pct("share", "Share"), C.pct("rto_pct", "RTO %"), C.pct("disc_pct", "Disc %"), C.pct("dm_pct", "DM %"),
+    C.money("net_sales", "Net Sales"), C.pct("cogs_ns", "COGS % NS"), C.money("gm", "Gross Margin"), C.pct("gm_pct", "GM %")], out, { sort: "net_gmv", total: tot });
+  const bc = groupSum(fPNL(), r => r.channel + "|" + r.brand, ["net_gmv"]);
+  const rows = [...new Set(fPNL().map(r => r.channel))].map(c => { const o = { channel: c, total: 0 };
+    brands.forEach(b => { o[b] = (bc.get(c + "|" + b) || { net_gmv: 0 }).net_gmv; o.total += o[b]; }); brands.forEach(b => o[b + "_s"] = div(o[b], o.total)); return o; });
+  const cols = [C.text("channel", "Channel")]; brands.forEach(b => cols.push(C.money(b, b + " Net GMV"), C.pct(b + "_s", b + " share"))); cols.push(C.money("total", "Total"));
+  table("tBrMx", cols, rows, { sort: "total" });
+}
+
+function renderGmv() {
+  const ml = monthlyPL();
+  drawBar("cGsLines", ml.map(r => r.month), [["RTO %", "rto_pct"], ["Discount %", "disc_pct"], ["Dealer margin %", "dm_pct"]].map(([l, k], i) =>
+    ({ label: l, type: "line", fmt: "pct", data: ml.map(r => r[k] == null ? null : +(r[k] * 100).toFixed(2)), color: SER[i] })), { fmt: "pct" });
+  const { out, tot } = plBy(r => r.channel, "channel");
+  const s = out.filter(r => r.gmv > 0).sort((a, b) => b.real - a.real);
+  drawBar("cGsReal", s.map(r => r.channel), [{ label: "Realisation", fmt: "pct", data: s.map(r => +(r.real * 100).toFixed(1)), color: "--s1" }], { horizontal: true, fmt: "pct" });
+  const cols = [C.money("gmv", "Gross GMV"), C.money("rto", "− RTO"), C.money("net_gmv", "Net GMV"), C.money("discount", "− Discount"), C.money("dealer_margin", "− Dealer margin"),
+    C.money("final_sales", "Final Sales"), C.money("tax", "− Tax"), C.money("net_sales", "Net Sales"), C.pct("real", "Realisation")];
+  table("tGsBridge", [C.text("channel", "Channel")].concat(cols), out, { sort: "gmv", total: tot });
+  table("tGsMonth", [C.text("month", "Month")].concat(cols), ml, { total: Object.assign({ month: "Total" }, tot) });
+}
+
+function skuRows() {
+  const by = groupSum(SKU.filter(keep), r => r.sku, PROD_M);
+  return [...by].map(([k, s]) => { const i = skuInfo[k] || ["", "Unmapped", "Unmapped"]; return Object.assign({ sku: k, name: i[0], category: i[1], sub: i[2] }, prodRow(s)); });
+}
+const SKU_COLS = [C.text("sku", "SKU"), C.text("name", "Name"), C.text("category", "Category"), C.text("sub", "Sub-category"), C.money("net_gmv", "Net GMV"), C.money("net_sales", "Net Sales"),
+  C.num("units", "Units"), C.money("cogs", "COGS"), C.pct("cogs_ns", "COGS % NS"), C.rs("asp", "Net GMV / unit"), C.rs("cpu", "COGS / unit")];
+
+function renderCogs() {
+  const tot = pl(sum(fPNL(), PNL_M), samplesTotal()), ml = monthlyPL();
+  kpis("cgKpis", [
+    { k: "COGS", v: money(tot.cogs), d: momText(ml, "cogs") }, { k: "COGS % of Net Sales", v: pct(tot.cogs_ns), d: momText(ml, "cogs_ns", true) },
+    { k: "COGS % of Net GMV", v: pct(tot.cogs_gmv), d: momText(ml, "cogs_gmv", true) },
+    { k: "RM", v: money(tot.rm), d: pct(div(tot.rm, tot.cogs)) + " of COGS" }, { k: "PM", v: money(tot.pm), d: pct(div(tot.pm, tot.cogs)) + " of COGS" },
+    { k: "Shrink + Shipper", v: money(tot.shrink + tot.shipper), d: pct(div(tot.shrink + tot.shipper, tot.cogs)) + " of COGS" },
+    { k: "Job Work", v: money(tot.jw), d: pct(div(tot.jw, tot.cogs)) + " of COGS" }, { k: "Samples cost", v: money(tot.samples), d: momText(ml, "samples") },
+    { k: "COGS per unit", v: tot.units ? "₹" + (tot.cogs / tot.units).toFixed(1) : "–" }, { k: "Units", v: nf(tot.units) },
+  ]);
+  drawBar("cCgStack", ml.map(r => r.month), [["RM", "rm"], ["PM", "pm"], ["Shrink", "shrink"], ["Shipper", "shipper"], ["Job Work", "jw"]].map(([l, k], i) => ({ label: l, data: ml.map(r => r[k]), color: SER[i] })), { stacked: true });
+  const { out, tot: t2 } = plBy(r => r.channel, "channel");
+  const s = out.filter(r => r.net_sales > 0).sort((a, b) => b.cogs_ns - a.cogs_ns);
+  drawBar("cCgPct", s.map(r => r.channel), [{ label: "COGS % NS", fmt: "pct", data: s.map(r => +(r.cogs_ns * 100).toFixed(1)), color: "--s1" }], { horizontal: true, fmt: "pct" });
+  table("tCgCh", [C.text("channel", "Channel"), C.money("cogs", "COGS"), C.pct("cogs_ns", "COGS % NS"), C.money("rm", "RM"), C.money("pm", "PM"), C.money("shrink", "Shrink"),
+    C.money("shipper", "Shipper"), C.money("jw", "JW"), C.num("units", "Units")], out, { sort: "cogs", total: t2 });
+  const cat = groupSum(CAT.filter(keep), r => r.category, PROD_M);
+  table("tCgCat", [C.text("category", "Category"), C.money("cogs", "COGS"), C.money("net_sales", "Net Sales"), C.pct("cogs_ns", "COGS % NS"), C.num("units", "Units"), C.rs("cpu", "COGS / unit")],
+    [...cat].map(([k, v]) => Object.assign({ category: k }, prodRow(v))), { sort: "cogs" });
+  const ms = selMonths(), sm = fSMP(), bt = groupSum(sm, r => r.sample_type + "|" + r.month, ["cogs", "units"]);
+  const types = FK.sample_type.opts.filter(t => sm.some(r => r.sample_type === t));
+  const srow = types.map(t => { const o = { type: t, total: 0, units: 0 }; ms.forEach(m => { const x = bt.get(t + "|" + m) || { cogs: 0, units: 0 }; o[m] = x.cogs; o.total += x.cogs; o.units += x.units; }); return o; });
+  const stot = { type: "Total", total: 0, units: 0 }; ms.forEach(m => { stot[m] = srow.reduce((a, r) => a + r[m], 0); stot.total += stot[m]; }); stot.units = srow.reduce((a, r) => a + r.units, 0);
+  table("tCgSmp", [C.text("type", "Type")].concat(ms.map(m => C.money(m, mLabel(m)))).concat([C.money("total", "Total"), C.num("units", "Units")]), srow, { sort: "total", total: stot });
+  const sc = groupSum(sm, r => r.channel, ["cogs", "units"]);
+  table("tCgSmpCh", [C.text("channel", "Channel"), C.money("cogs", "Samples cost"), C.num("units", "Units")], [...sc].map(([k, v]) => Object.assign({ channel: k }, v)), { sort: "cogs",
+    total: Object.assign({ channel: "Total" }, sum(sm, ["cogs", "units"])) });
+  table("tCgSku", SKU_COLS, skuRows(), { sort: "cogs", limit: 50 });
+}
+
+function renderProduct() {
+  const cr = CAT.filter(keep);
+  const mk = (by, label) => [...by].map(([k, s]) => Object.assign({ [label]: k }, prodRow(s)));
+  const cats = mk(groupSum(cr, r => r.category, PROD_M), "category"), tn = cats.reduce((a, r) => a + r.net_gmv, 0);
+  cats.forEach(r => r.share = div(r.net_gmv, tn));
+  const cols = (f, l) => [C.text(f, l), C.money("net_gmv", "Net GMV"), C.pct("share", "Share"), C.money("net_sales", "Net Sales"), C.num("units", "Units"), C.money("cogs", "COGS"), C.pct("cogs_ns", "COGS % NS")];
+  table("tPdCat", cols("category", "Category"), cats, { sort: "net_gmv", rowKey: "category", selected: S.cat, onRow: k => { S.cat = S.cat === k ? null : k; S.sub = null; render(); } });
+  const subs = mk(groupSum(cr.filter(r => !S.cat || r.category === S.cat), r => r.sub_category, PROD_M), "sub_category"), ts = subs.reduce((a, r) => a + r.net_gmv, 0);
+  subs.forEach(r => r.share = div(r.net_gmv, ts));
+  $("pdCatName").textContent = S.cat ? "within " + S.cat + " · click a row to filter SKUs" : "all categories · click a row to filter SKUs";
+  table("tPdSub", cols("sub_category", "Sub-category"), subs, { sort: "net_gmv", rowKey: "sub_category", selected: S.sub, onRow: k => { S.sub = S.sub === k ? null : k; render(); } });
+  const q = S.search.toLowerCase();
+  table("tPdSku", SKU_COLS, skuRows().filter(r => (!S.cat || r.category === S.cat) && (!S.sub || r.sub === S.sub) && (!q || r.sku.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))), { sort: "net_gmv", limit: 500 });
+}
+
+function renderSecondary() {
+  const sr = fSEC(), tot = secRow(sum(sr, SEC_M));
+  const chans = new Set(sr.map(r => r.channel)), prim = fPNL().filter(r => chans.has(r.channel));
+  const pc = groupSum(prim, r => r.channel, ["net_gmv"]), pTot = prim.reduce((a, r) => a + r.net_gmv, 0);
+  const ms = selMonths(), smM = groupSum(sr, r => r.month, SEC_M), pmM = groupSum(prim, r => r.month, ["net_gmv"]);
+  const mrows = ms.map(m => Object.assign({ month: mLabel(m), primary: (pmM.get(m) || { net_gmv: 0 }).net_gmv }, secRow(smM.get(m) || sum([], SEC_M))));
+  mrows.forEach(r => r.st = div(r.gmv, r.primary));
+  kpis("scKpis", [
+    { k: "Secondary GMV", v: money(tot.gmv), d: momText(mrows, "gmv") }, { k: "Partner margin", v: money(tot.margin), d: pct(tot.margin_pct) + " of GMV" },
+    { k: "Net (GMV − margin − tax)", v: money(tot.net), d: momText(mrows, "net") }, { k: "COGS", v: money(tot.cogs), d: pct(tot.cogs_net) + " of Net" },
+    { k: "Sell-through vs sell-in", v: pct(div(tot.gmv, pTot)), d: "Secondary GMV ÷ primary Net GMV" },
+  ]);
+  drawBar("cScTrend", mrows.map(r => r.month), [{ label: "Primary Net GMV (sell-in)", data: mrows.map(r => r.primary), color: "--s1" }, { label: "Secondary GMV (sell-through)", data: mrows.map(r => r.gmv), color: "--s2" }]);
+  const rows = [...groupSum(sr, r => r.channel, SEC_M)].map(([k, s]) => Object.assign({ channel: k, primary: (pc.get(k) || { net_gmv: 0 }).net_gmv }, secRow(s)));
+  rows.forEach(r => r.st = div(r.gmv, r.primary));
+  const sb = rows.slice().sort((a, b) => b.gmv - a.gmv);
+  drawBar("cScBar", sb.map(r => r.channel), [{ label: "Secondary GMV", data: sb.map(r => r.gmv), color: "--s2" }], { horizontal: true });
+  const cols = [C.money("gmv", "Secondary GMV"), C.money("margin", "Margin"), C.pct("margin_pct", "Margin %"), C.money("tax", "Tax"), C.money("net", "Net"), C.money("cogs", "COGS"),
+    C.pct("cogs_net", "COGS % Net"), C.num("units", "Units"), C.money("primary", "Primary Net GMV"), C.pct("st", "Sell-through")];
+  const total = Object.assign({ primary: pTot, st: div(tot.gmv, pTot) }, tot);
+  table("tScCh", [C.text("channel", "Channel")].concat(cols), rows, { sort: "gmv", total: Object.assign({ channel: "Total" }, total) });
+  table("tScMonth", [C.text("month", "Month")].concat(cols), mrows, { total: Object.assign({ month: "Total" }, total) });
+  const sk = [...groupSum(sr, r => r.sku, SEC_M)].map(([k, s]) => Object.assign({ sku: k, name: (skuInfo[k] || [""])[0], sub: (skuInfo[k] || ["", "", ""])[2] }, secRow(s)));
+  table("tScSku", [C.text("sku", "SKU"), C.text("name", "Name"), C.text("sub", "Sub-category"), C.money("gmv", "Secondary GMV"), C.pct("margin_pct", "Margin %"), C.money("net", "Net"),
+    C.num("units", "Units"), C.money("cogs", "COGS"), C.pct("cogs_net", "COGS % Net")], sk, { sort: "gmv", limit: 50 });
+}
+
+function renderHealth() {
+  const h = D.health;
+  $("hMeta").textContent = `rows read: Sales ${nf(h.rows.sales_dump)} · Prod ${nf(h.rows.prod_dump)} · Samples ${nf(h.rows.samples)} · Secondary ${nf(h.rows.secondary)}`;
+  $("hList").innerHTML = h.checks.map(c => `<li><span class="pill ${c.ok ? "pill-pos" : "pill-neg"}">${c.ok ? "PASS" : "FAIL"}</span> <b>${esc(c.check)}</b><span class="det">${esc(c.detail)}</span></li>`).join("");
+}
+
+/* ── rail filters: boxed groups, search, live count, staged Apply ── */
+function buildFilters() {
+  const host = $("fHost");
+  host.innerHTML = Object.keys(FK).map(k => {
+    const f = FK[k], show = f.show || (v => v);
+    return `<div class="filter-group${["month", "dump_type", "brand"].includes(k) ? " open" : ""}" data-k="${k}"><h4><span>${f.label}</span><span class="count"></span></h4>
+      <div class="fg-body">${f.hint ? `<p class="fg-hint">${esc(f.hint)}</p>` : ""}${f.opts.length > 8 ? `<input type="search" class="filter-search" placeholder="Search ${f.label.toLowerCase()}…" aria-label="Search ${f.label}">` : ""}
+      <div class="filter-list"><label class="fl-all"><input type="checkbox" data-all="1"> All</label><div class="fl-divider"></div>
+      ${f.opts.map(v => `<label title="${esc(show(v))}"><input type="checkbox" value="${esc(v)}"><span>${esc(show(v))}</span><span class="only" data-only="${esc(v)}">only</span></label>`).join("")}</div></div></div>`;
+  }).join("");
+  Object.keys(FK).forEach(syncGroup);
+}
+function syncGroup(k) {
+  const g = document.querySelector(`.filter-group[data-k="${k}"]`); if (!g) return;
+  const t = FK[k].opts.length, n = pend[k].size;
+  g.querySelectorAll(".filter-list input:not([data-all])").forEach(c => c.checked = pend[k].has(c.value));
+  const all = g.querySelector("input[data-all]"); all.checked = n === t; all.indeterminate = n > 0 && n < t;
+  g.querySelector(".count").textContent = n === t ? "All" : n === 0 ? "None" : n + " of " + t;
+}
+const sameSet = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
+const railDirty = () => Object.keys(FK).some(k => !sameSet(sel[k], pend[k]));
+function markDirty() { const d = railDirty(); $("applyBtn").disabled = !d; $("applyBtn").classList.toggle("dirty", d); }
+function applyRail() {
+  Object.keys(FK).forEach(k => { if (!pend[k].size) pend[k] = new Set(FK[k].opts); sel[k] = new Set(pend[k]); syncGroup(k); });
+  S.cat = null; S.sub = null; markDirty(); syncWorkspace(); render();
+}
+const host = $("fHost");
+host.addEventListener("click", e => {
+  const only = e.target.closest("[data-only]");
+  if (only) { e.preventDefault(); const k = only.closest(".filter-group").dataset.k; pend[k] = new Set([only.dataset.only]); syncGroup(k); markDirty(); return; }
+  const h = e.target.closest(".filter-group h4"); if (h) h.parentElement.classList.toggle("open");
+});
+host.addEventListener("input", e => {
+  if (!e.target.classList.contains("filter-search")) return;
+  const q = e.target.value.trim().toLowerCase();
+  e.target.parentElement.querySelectorAll(".filter-list label:not(.fl-all)").forEach(l => l.hidden = !!q && !l.textContent.toLowerCase().includes(q));
+});
+host.addEventListener("change", e => {
+  const cb = e.target; if (cb.type !== "checkbox") return;
+  const k = cb.closest(".filter-group").dataset.k;
+  if (cb.dataset.all) pend[k] = new Set(cb.checked ? FK[k].opts : []);
+  else cb.checked ? pend[k].add(cb.value) : pend[k].delete(cb.value);
+  syncGroup(k); markDirty();
+});
+$("applyBtn").onclick = applyRail;
+$("resetBtn").onclick = () => { Object.keys(FK).forEach(k => pend[k] = defaults(k)); applyRail(); };
+function setRailHidden(h) {
+  $("wrap").classList.toggle("filters-hidden", h);
+  $("railToggle").setAttribute("aria-expanded", String(!h)); $("railToggle").title = h ? "Show filters" : "Hide filters";
+  try { localStorage.setItem("misRailHidden", h ? "1" : "0"); } catch (e) {}
+  setTimeout(() => Object.values(charts).forEach(c => c.resize()), 200);
+}
+$("railToggle").onclick = () => setRailHidden(!$("wrap").classList.contains("filters-hidden"));
+$("railTitle").onclick = () => { if ($("wrap").classList.contains("filters-hidden")) setRailHidden(false); };
+try { if (localStorage.getItem("misRailHidden") === "1") setRailHidden(true); } catch (e) {}
+const closeMobile = () => { $("rail").classList.remove("open"); $("mobileScrim").classList.remove("show"); };
+$("mobileMenuBtn").onclick = () => { $("rail").classList.add("open"); $("mobileScrim").classList.add("show"); };
+$("mobileScrim").onclick = closeMobile;
+
+/* ── header: workspace (brand) chip, units, theme ── */
+const WS = [["__all__", "All Brands", "AB"]].concat(FK.brand.opts.map(b => [b, b, b.slice(0, 2).toUpperCase()]));
+function syncWorkspace() {
+  const cur = isAll("brand") ? "__all__" : sel.brand.size === 1 ? [...sel.brand][0] : null;
+  const w = WS.find(x => x[0] === cur);
+  $("wsName").textContent = w ? w[1] : sel.brand.size + " brands"; $("wsIcon").textContent = w ? w[2] : "··";
+  $("wsMenu").innerHTML = WS.map(([v, n, i]) => `<button type="button" data-ws="${esc(v)}" class="${v === cur ? "active" : ""}"><span class="ws-icon">${i}</span>${esc(n)}</button>`).join("");
+}
+$("workspaceChip").onclick = (e) => {
+  const b = e.target.closest("[data-ws]");
+  if (b) { const v = b.dataset.ws; pend.brand = v === "__all__" ? new Set(FK.brand.opts) : new Set([v]); syncGroup("brand"); applyRail(); $("workspaceChip").classList.remove("open"); return; }
+  $("workspaceChip").classList.toggle("open");
+};
+document.addEventListener("click", e => { if (!e.target.closest("#workspaceChip")) $("workspaceChip").classList.remove("open"); });
+$("unitSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.unit = +b.dataset.unit;
+  $("unitSeg").querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b)); render(); };
+$("themeBtn").onclick = () => { const r = document.documentElement, t = r.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  r.setAttribute("data-theme", t); try { localStorage.setItem("dashboardTheme", t); } catch (e) {} render(); };
+$("pdSearch").oninput = (e) => { S.search = e.target.value; renderProduct(); };
+
+/* ── panels collapse on title click ── */
+document.addEventListener("click", e => { const h = e.target.closest(".panel>h2"); if (h && !e.target.closest("button")) { h.parentElement.classList.toggle("collapsed"); render(); } });
+
+/* ── tabs ── */
+const TABS = [["overview", "Overview"], ["channels", "Channels"], ["brands", "Brands"], ["gmv", "GMV & Sales"], ["cogs", "COGS"], ["product", "Category & SKU"], ["secondary", "Secondary Sales"], ["health", "Data Health"]];
+if (!TABS.some(t => t[0] === S.tab)) S.tab = "overview";
+$("tabs").innerHTML = TABS.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join("");
+$("tabs").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; S.tab = b.dataset.tab; history.replaceState(null, "", "#" + S.tab); render(); };
+
+const RENDER = { overview: renderOverview, channels: renderChannels, brands: renderBrands, gmv: renderGmv, cogs: renderCogs, product: renderProduct, secondary: renderSecondary, health: renderHealth };
+const AF = { overview: "afOverview", channels: "afChannels", brands: "afBrands", gmv: "afGmv", cogs: "afCogs", product: "afProduct", secondary: "afSecondary" };
+function render() {
+  $("tabs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.tab === S.tab));
+  document.querySelectorAll("section.tab").forEach(s => s.classList.toggle("on", s.id === "tab-" + S.tab));
+  if (AF[S.tab]) $(AF[S.tab]).innerHTML = `<span>${unitLabel()} ·</span>` + (Object.keys(FK).filter(k => !isAll(k)).map(k =>
+    `<span class="af-chip">${FK[k].label}: ${esc(sel[k].size > 3 ? sel[k].size + " selected" : [...sel[k]].map(v => FK[k].show ? FK[k].show(v) : v).join(", "))}</span>`).join("") || '<span class="af-chip">All data</span>');
+  RENDER[S.tab]();
+}
+
+const last = MONTHS[MONTHS.length - 1];
+$("asof").textContent = MN[+last.slice(5, 7) - 1] + " " + last.slice(0, 4);
+$("builtAt").textContent = D.meta.generated;
+$("refreshChip").classList.toggle("is-masked", !!D.meta.masked); $("refreshChip").classList.toggle("is-actual", !D.meta.masked);
+$("maskText").textContent = D.meta.masked ? "Indexed values · % actual" : "Actual values · confidential, do not share";
+$("maskPill").title = D.meta.masked ? "Rupee and unit values are scaled by a fixed factor before publishing. Percentages are actual." : "This copy shows the real MIS numbers. It is built locally and is never published.";
+$("foot").innerHTML = (D.meta.masked ? "Values are indexed (scaled by a fixed factor) before publishing; every % is actual." : "<b>Actual values.</b> This local copy is not published; share the indexed version instead.") + ` Net GMV = GMV − RTO/Cancellation (ties to Prod Dump Updated GMV). Net Sales = Final Sales − GST. COGS = RM + PM + Shrink + Shipper + Job Work. Gross Margin = Net Sales − COGS − Samples. Secondary sales are shown on their own and never added to primary totals.`;
+buildFilters(); syncWorkspace(); render();
+addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+})();
+</script>
+</body>
+</html>
