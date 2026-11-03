@@ -9,6 +9,7 @@ input/                      monthly MIS workbooks (raw, unmasked)
 pipeline/config.py          mask factor, sheet/column map, brand + channel mapping, channel groups
 pipeline/pipeline.py        extract → normalise → reconcile → aggregate → mask → write
 pipeline/make_template.py   rebuilds template/MIS_Template_Next_Month.xlsx
+pipeline/mask_workbook.py   masked copy of an MIS workbook (× 0.75, formulas kept) → output/<name>_masked.xlsx
 template/                   empty workbook for the next month (single per-unit COGS)
 docs/index.html             the dashboard (GitHub Pages serves docs/)
 docs/data.js                masked data the dashboard reads (written by the pipeline)
